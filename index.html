@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SGE - Equipe 5</title>
+<style>
+:root{--laranja:#EF6C00;--branco:#fff;--texto:#212121;--texto2:#757575;--linha:#E0E0E0;--claro:#FFF3E0}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{background:#ececec;font-family:Roboto,"Segoe UI",system-ui,sans-serif;color:var(--texto)}
+
+/* moldura de celular: no telefone ocupa a tela toda */
+.app{width:100%;max-width:420px;height:100vh;margin:0 auto;background:var(--branco);position:relative;overflow:hidden}
+@media(min-width:480px){body{padding:20px 0}.app{height:calc(100vh - 40px);max-height:880px;border-radius:28px;border:2px solid #c9c9c9}}
+
+/* cada tela é uma <section>; só a ativa aparece (como a pilha de Activities) */
+.tela{display:none;flex-direction:column;height:100%;min-height:0}
+.tela.ativa{display:flex}
+
+.topo{position:relative;display:flex;flex-direction:column;align-items:center;padding:16px 20px 12px;flex:none}
+.topo-img{width:100%;max-height:120px;object-fit:contain}
+.topo h1{margin:10px 0 0;font-size:22px;font-weight:700}
+.voltar{position:absolute;left:8px;top:8px;width:40px;height:40px;border:0;background:none;color:var(--laranja);font-size:34px;line-height:1;cursor:pointer}
+.faixa{height:3px;background:var(--laranja);flex:none}
+
+.resumo{padding:12px 20px 2px;font-size:14px;color:var(--texto2);flex:none}
+.dica{padding:0 20px 8px;font-size:12px;color:var(--laranja);flex:none}
+.prog{height:3px;background:#FFE0B2;overflow:hidden;visibility:hidden;flex:none}
+.prog.on{visibility:visible}
+.prog i{display:block;height:100%;width:35%;background:var(--laranja);animation:mv 1s infinite linear}
+@keyframes mv{from{margin-left:-35%}to{margin-left:100%}}
+
+.lista{flex:1;min-height:0;overflow-y:auto;padding:0 8px}
+.linha{display:flex;align-items:center;gap:8px;min-height:60px;padding:10px 12px;border-bottom:.5px solid var(--linha);cursor:pointer}
+.linha:active{background:var(--claro)}
+.nome{flex:1;font-size:16px}
+.status{font-size:14px;font-weight:700;min-width:62px;text-align:right;margin-right:6px}
+.status.ok{color:var(--laranja)}.status.no{color:var(--texto2)}
+.sw{position:relative;width:40px;height:22px;flex:none}
+.sw input{position:absolute;inset:0;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+.trilho{position:absolute;inset:0;border-radius:11px;background:#E0E0E0;transition:background .15s;pointer-events:none}
+.trilho::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#9E9E9E;transition:left .15s,background .15s}
+.sw input:checked+.trilho{background:var(--laranja)}
+.sw input:checked+.trilho::after{left:21px;background:#fff}
+
+.rodape{flex:none;border-top:.5px solid var(--linha);padding:14px 32px max(18px,env(safe-area-inset-bottom));background:var(--branco)}
+.btn-grande,.btn-contorno{display:block;width:100%;border-radius:32px;font:inherit;font-weight:700;cursor:pointer}
+.btn-grande{height:64px;border:0;background:var(--laranja);color:#fff;font-size:18px}
+.btn-grande:disabled{opacity:.5;cursor:default}
+.btn-contorno{height:52px;margin-top:10px;border:2px solid var(--laranja);background:#fff;color:var(--laranja);font-size:16px}
+.btn-contorno[hidden]{display:none}
+
+.form{flex:1;min-height:0;overflow-y:auto;padding:4px 20px 20px}
+.form label{display:block;margin-top:16px;font-size:13px;color:var(--texto2)}
+.form input,.form select{width:100%;height:48px;border:0;border-bottom:2px solid var(--laranja);border-radius:0;background:transparent;font:inherit;font-size:16px;color:var(--texto);outline:none}
+.form input::placeholder{color:#9E9E9E}
+.previa{margin-top:24px;height:180px;padding:8px;background:var(--claro);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center}
+.previa img{width:100px;height:65px;object-fit:contain}
+.previa .ev{font-size:14px}.previa .pa{font-size:16px;font-weight:700}
+.resultado{margin-top:20px;padding:12px 14px;border:1px solid var(--laranja);border-radius:12px;background:var(--claro);font-size:14px}
+.resultado[hidden]{display:none}
+.resultado a{color:var(--laranja);font-weight:700}
+.resultado img{display:block;width:60%;margin:10px auto 0;border:1px solid var(--linha)}
+
+.toast{position:fixed;left:50%;bottom:200px;transform:translateX(-50%);max-width:340px;background:#212121;color:#fff;font-size:13px;padding:9px 16px;border-radius:18px;opacity:0;transition:opacity .2s;pointer-events:none;text-align:center;z-index:9}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ===================== TELA 1: LISTA DE PRESENÇA ===================== -->
+  <section class="tela" id="tela-presenca">
+    <header class="topo">
+      <img class="topo-img" data-logo alt="Logo">
+      <h1>Lista de Chamada</h1>
+    </header>
+    <div class="faixa"></div>
+    <div class="resumo" id="resumo">Presentes: 0 | Faltas: 0 | Total: 0</div>
+    <div class="dica">Toque num participante presente para emitir o certificado</div>
+    <div class="prog" id="prog"><i></i></div>
+    <main class="lista" id="lista"></main>
+    <footer class="rodape">
+      <button class="btn-grande" id="btnSalvar">Salvar Presenças</button>
+    </footer>
+  </section>
+
+  <!-- ===================== TELA 2: CERTIFICADO ===================== -->
+  <section class="tela" id="tela-certificado">
+    <header class="topo">
+      <button class="voltar" data-voltar aria-label="Voltar">&#8249;</button>
+      <img class="topo-img" data-logo alt="Logo">
+      <h1>Emitir Certificado</h1>
+    </header>
+    <div class="faixa"></div>
+    <main class="form" id="form-certificado">
+      <label for="cert-participante">Participante</label>
+      <input id="cert-participante" placeholder="Nome do participante" autocomplete="off">
+      <label for="cert-evento">Evento</label>
+      <input id="cert-evento" placeholder="Nome do evento" autocomplete="off">
+      <label for="spnTipo">Tipo</label>
+      <select id="spnTipo"></select>
+      <label for="spnModelo">Modelo</label>
+      <select id="spnModelo"></select>
+      <div class="resultado" id="cert-resultado" hidden></div>
+    </main>
+    <footer class="rodape">
+      <button class="btn-grande" id="btnGerar">Gerar Certificado</button>
+      <button class="btn-contorno" id="btnCracha" hidden>Continuar para o crachá</button>
+    </footer>
+  </section>
+
+  <!-- ===================== TELA 3: CRACHÁ ===================== -->
+  <section class="tela" id="tela-cracha">
+    <header class="topo">
+      <button class="voltar" data-voltar aria-label="Voltar">&#8249;</button>
+      <h1>Gerador de Crachá</h1>
+    </header>
+    <div class="faixa"></div>
+    <main class="form" id="form-cracha">
+      <label for="cr-participante">Participante</label>
+      <input id="cr-participante" placeholder="Nome do participante" autocomplete="off">
+      <label for="cr-evento">Evento</label>
+      <input id="cr-evento" placeholder="Nome do evento" autocomplete="off">
+      <div class="previa" id="previaCracha">
+        <img data-logo alt="Logo do evento">
+        <div class="ev" id="txtEvento">NOME DO EVENTO</div>
+        <div class="pa" id="txtParticipante">NOME DO PARTICIPANTE</div>
+      </div>
+      <div class="resultado" id="cr-resultado" hidden></div>
+    </main>
+    <footer class="rodape">
+      <button class="btn-grande" id="botaoGerar">Gerar imagem</button>
+    </footer>
+  </section>
+
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+/* ============================ BASE ============================ */
+const $ = (id) => document.getElementById(id);
+// Servido pelo Flask: mesma origem. Aberto direto do disco (file://): fala com o Flask em 127.0.0.1:5000.
+// Outra porta/endereço? Abra assim:  index.html?api=http://127.0.0.1:5056
+const API = (new URLSearchParams(location.search).get('api') || (location.protocol === 'file:' ? 'http://127.0.0.1:5000' : '')).replace(/\/$/, '');
+const JSON_H = {'Content-Type': 'application/json'};
+
+let _toast;
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(_toast); _toast = setTimeout(() => t.classList.remove('on'), 2600);
+}
+async function api(url, opcoes){
+  const r = await fetch(API + url, opcoes);
+  let corpo = null; try { corpo = await r.json(); } catch (e) {}
+  return {ok: r.ok, status: r.status, corpo};
+}
+function limparCampo(el){ while (el.firstChild) el.removeChild(el.firstChild); }
+function mostrarArquivo(caixa, rotulo, arquivo, url, textoLink, comImagem){
+  limparCampo(caixa); caixa.hidden = false;
+  caixa.append(rotulo + ' ');
+  const b = document.createElement('b'); b.textContent = arquivo; caixa.append(b, document.createElement('br'));
+  const a = document.createElement('a'); a.href = API + url; a.target = '_blank'; a.textContent = textoLink; caixa.append(a);
+  if (comImagem) { const img = document.createElement('img'); img.alt = 'Crachá gerado'; img.src = API + url; caixa.append(img); }
+}
+document.querySelectorAll('[data-logo]').forEach(i => i.src = API + '/logo');
+document.querySelectorAll('[data-voltar]').forEach(b => b.addEventListener('click', voltar));
+
+/* ============================ NAVEGAÇÃO ============================
+   Presença -> Certificado -> Crachá.  A rota fica no #hash (ex.: #/certificado?participante=Ana)
+   e cada tela é uma <section>. A tela de presença continua viva ao navegar (igual à pilha do Android). */
+function irPara(rota, dados){
+  location.hash = '/' + rota + (dados ? '?' + new URLSearchParams(dados).toString() : '');
+}
+function voltar(){ if (history.length > 1) history.back(); else irPara('presenca'); }
+
+function lerRota(){
+  const [rota, q] = location.hash.replace(/^#\/?/, '').split('?');
+  return {rota: rota || 'presenca', params: new URLSearchParams(q || '')};
+}
+function rotear(){
+  const {rota, params} = lerRota();
+  const nome = TELAS[rota] ? rota : 'presenca';
+  document.querySelectorAll('.tela').forEach(s => s.classList.toggle('ativa', s.id === 'tela-' + nome));
+  TELAS[nome].entrar(params);
+}
+
+/* ============================ TELA 1: PRESENÇA ============================ */
+const telaPresenca = (() => {
+  let idEvento = 1, nomeEvento = 'Evento X', lista = [], carregou = false;
+
+  function resumo(){
+    const p = lista.filter(c => c.presente).length, t = lista.length;
+    $('resumo').textContent = `Presentes: ${p} | Faltas: ${t - p} | Total: ${t}`;
+  }
+  function carregando(on){ $('prog').classList.toggle('on', on); $('btnSalvar').disabled = on; }
+
+  function render(){
+    const box = $('lista'); limparCampo(box);
+    lista.forEach(c => {
+      const row = document.createElement('div'); row.className = 'linha';
+      const nome = document.createElement('span'); nome.className = 'nome'; nome.textContent = c.nome;
+      const st = document.createElement('span');
+      const sw = document.createElement('label'); sw.className = 'sw';
+      const input = document.createElement('input'); input.type = 'checkbox';
+      input.setAttribute('aria-label', 'Presença de ' + c.nome);
+      const trilho = document.createElement('span'); trilho.className = 'trilho';
+      sw.append(input, trilho);
+      const pintar = () => {
+        st.textContent = c.presente ? 'Presente' : 'Falta';
+        st.className = 'status ' + (c.presente ? 'ok' : 'no');
+        input.checked = c.presente;
+      };
+      input.addEventListener('change', () => { c.presente = input.checked; c.alterado = true; pintar(); resumo(); });
+      sw.addEventListener('click', e => e.stopPropagation());
+      row.addEventListener('click', () => abrirCertificado(c));
+      pintar(); row.append(nome, st, sw); box.appendChild(row);
+    });
+  }
+
+  // GET /eventos/{id}/chamada
+  async function carregar(){
+    carregando(true);
+    const r = await api(`/eventos/${idEvento}/chamada`).catch(() => ({ok: false}));
+    carregando(false);
+    if (!r.ok) { toast('Erro ao carregar a lista'); return; }
+    lista = r.corpo.map(c => ({id: c.id, idParticipante: c.id_participante, nome: c.nome_participante, presente: c.presente, alterado: false}));
+    carregou = true; render(); resumo();
+  }
+
+  // PUT /chamada/{id}/presenca  (um por participante alterado)
+  async function salvar(){
+    const alteradas = lista.filter(c => c.alterado);
+    if (!alteradas.length) { toast('Nenhuma alteração pra salvar'); return; }
+    carregando(true);
+    let erros = 0;
+    await Promise.all(alteradas.map(async c => {
+      const r = await api(`/chamada/${c.id}/presenca`, {method: 'PUT', headers: JSON_H, body: JSON.stringify({presente: c.presente})}).catch(() => ({ok: false}));
+      if (r.ok) c.alterado = false; else erros++;
+    }));
+    carregando(false);
+    toast(erros === 0 ? 'Presenças salvas!' : `${erros} falha(s) ao salvar. Toque em Salvar de novo.`);
+  }
+
+  // regra de negócio: certificado só com presença validada (marcada E salva)
+  function abrirCertificado(c){
+    if (!c.presente) { toast('Certificado só pra quem tem presença validada'); return; }
+    if (c.alterado)  { toast('Salve as presenças antes de emitir o certificado'); return; }
+    irPara('certificado', {evento_id: idEvento, evento: nomeEvento, participante_id: c.idParticipante, participante: c.nome});
+  }
+
+  $('btnSalvar').addEventListener('click', salvar);
+  return {
+    entrar(params){
+      const novo = parseInt(params.get('evento_id') || '0', 10);
+      if (novo) nomeEvento = params.get('evento') || nomeEvento;
+      if (novo && novo !== idEvento) { idEvento = novo; carregou = false; }
+      if (!carregou) carregar();   // ao voltar das outras telas, mantém a lista como estava
+    }
+  };
+})();
+
+/* ============================ TELA 2: CERTIFICADO ============================ */
+const telaCertificado = (() => {
+  let idEvento = 0, idParticipante = 0, opcoesOk = false;
+
+  function preencher(select, itens){
+    limparCampo(select);
+    itens.forEach(t => { const o = document.createElement('option'); o.textContent = t; select.appendChild(o); });
+  }
+  async function carregarOpcoes(){
+    if (!opcoesOk) {
+      const r = await api('/api/opcoes').catch(() => ({ok: false}));
+      if (!r.ok) { toast('Não consegui carregar os tipos e modelos'); return; }
+      preencher($('spnTipo'), r.corpo.tipos); preencher($('spnModelo'), r.corpo.modelos); opcoesOk = true;
+    }
+    if (idEvento) {   // modelo escolhido em cascata: evento -> curso -> padrão
+      const m = await api('/modelos/resolver/' + idEvento).catch(() => ({ok: false}));
+      if (m.ok) $('spnModelo').value = m.corpo.nome;
+    }
+  }
+
+  // POST /certificados
+  async function gerar(){
+    const participante = $('cert-participante').value.trim(), evento = $('cert-evento').value.trim();
+    if (!participante || !evento) { toast('Preencha o participante e o evento.'); return; }
+    $('btnGerar').disabled = true;
+    const r = await api('/certificados', {method: 'POST', headers: JSON_H, body: JSON.stringify({
+      participante, evento, tipo: $('spnTipo').value, modelo: $('spnModelo').value,
+      participante_id: idParticipante || null, evento_id: idEvento || null})}).catch(() => ({ok: false}));
+    $('btnGerar').disabled = false;
+    if (!r.ok) { toast((r.corpo && r.corpo.erro) || 'Erro ao gerar PDF'); return; }
+    mostrarArquivo($('cert-resultado'), 'PDF salvo em', r.corpo.arquivo, r.corpo.url, 'Abrir PDF', false);
+    $('btnCracha').hidden = false;
+    toast('PDF salvo em ' + r.corpo.arquivo);
+  }
+
+  $('btnGerar').addEventListener('click', gerar);
+  $('btnCracha').addEventListener('click', () => irPara('cracha', {
+    evento_id: idEvento, evento: $('cert-evento').value.trim(),
+    participante_id: idParticipante, participante: $('cert-participante').value.trim()}));
+  return {
+    entrar(params){
+      idEvento = parseInt(params.get('evento_id') || '0', 10);
+      idParticipante = parseInt(params.get('participante_id') || '0', 10);
+      $('cert-participante').value = params.get('participante') || '';
+      $('cert-evento').value = params.get('evento') || '';
+      $('cert-resultado').hidden = true; $('btnCracha').hidden = true;
+      $('form-certificado').scrollTop = 0;
+      carregarOpcoes();
+    }
+  };
+})();
+
+/* ============================ TELA 3: CRACHÁ ============================ */
+const telaCracha = (() => {
+  // POST /crachas
+  async function gerar(){
+    const participante = $('cr-participante').value.trim(), evento = $('cr-evento').value.trim();
+    if (!participante || !evento) { toast('Preencha o evento e o participante!'); return; }
+    $('txtParticipante').textContent = participante.toUpperCase();
+    $('txtEvento').textContent = evento;
+    $('botaoGerar').disabled = true;
+    const r = await api('/crachas', {method: 'POST', headers: JSON_H, body: JSON.stringify({participante, evento})}).catch(() => ({ok: false}));
+    $('botaoGerar').disabled = false;
+    if (!r.ok) { toast((r.corpo && r.corpo.erro) || 'Erro ao salvar a imagem!'); return; }
+    mostrarArquivo($('cr-resultado'), 'Imagem salva em:', r.corpo.arquivo, r.corpo.url, 'Abrir imagem', true);
+    toast('Imagem salva em:\n' + r.corpo.arquivo);
+  }
+  $('botaoGerar').addEventListener('click', gerar);
+  return {
+    entrar(params){
+      $('cr-participante').value = params.get('participante') || '';
+      $('cr-evento').value = params.get('evento') || '';
+      $('txtParticipante').textContent = 'NOME DO PARTICIPANTE';
+      $('txtEvento').textContent = 'NOME DO EVENTO';
+      $('cr-resultado').hidden = true;
+      $('form-cracha').scrollTop = 0;
+    }
+  };
+})();
+
+/* ============================ START ============================ */
+const TELAS = {presenca: telaPresenca, certificado: telaCertificado, cracha: telaCracha};
+window.addEventListener('hashchange', rotear);
+rotear();
+</script>
+</body>
+</html>
