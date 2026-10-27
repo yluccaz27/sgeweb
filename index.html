@@ -141,37 +141,109 @@ body{background:#ececec;font-family:Roboto,"Segoe UI",system-ui,sans-serif;color
 <div id="toast" class="toast"></div>
 
 <script>
-/* ============================ BASE ============================ */
+/* ============================ BASE & MOCKS ============================ */
 const $ = (id) => document.getElementById(id);
-// Servido pelo Flask: mesma origem. Aberto direto do disco (file://): fala com o Flask em 127.0.0.1:5000.
-// Outra porta/endereço? Abra assim:  index.html?api=http://127.0.0.1:5056
-const API = (new URLSearchParams(location.search).get('api') || (location.protocol === 'file:' ? 'http://127.0.0.1:5000' : '')).replace(/\/$/, '');
-const JSON_H = {'Content-Type': 'application/json'};
 
 let _toast;
 function toast(msg){
   const t = $('toast'); t.textContent = msg; t.classList.add('on');
   clearTimeout(_toast); _toast = setTimeout(() => t.classList.remove('on'), 2600);
 }
+
+// Simulando o banco de dados que antes ficava no Python
+const mockChamada = [
+  {id: 1, id_participante: 101, nome_participante: "João Silva", presente: false},
+  {id: 2, id_participante: 102, nome_participante: "Maria Souza", presente: false},
+  {id: 3, id_participante: 103, nome_participante: "Carlos Andrade", presente: false},
+  {id: 4, id_participante: 104, nome_participante: "Ana Paula Ribeiro", presente: true},
+  {id: 5, id_participante: 105, nome_participante: "Pedro Henrique", presente: false},
+  {id: 6, id_participante: 106, nome_participante: "Fernanda Lima", presente: true},
+  {id: 7, id_participante: 107, nome_participante: "Rafael Rodrigues", presente: false},
+  {id: 8, id_participante: 108, nome_participante: "Vitória Cristina", presente: false}
+];
+
+// Substituindo o fetch por uma promise que simula as rotas do backend
 async function api(url, opcoes){
-  const r = await fetch(API + url, opcoes);
-  let corpo = null; try { corpo = await r.json(); } catch (e) {}
-  return {ok: r.ok, status: r.status, corpo};
+  return new Promise(resolve => {
+    setTimeout(() => {
+      let reqBody = opcoes && opcoes.body ? JSON.parse(opcoes.body) : null;
+      let method = opcoes && opcoes.method ? opcoes.method : 'GET';
+
+      if (url.includes('/chamada') && method === 'GET') {
+        resolve({ok: true, status: 200, corpo: mockChamada});
+      }
+      else if (url.includes('/presenca') && method === 'PUT') {
+        let id = parseInt(url.split('/')[2]);
+        let p = mockChamada.find(c => c.id === id);
+        if (p) p.presente = reqBody.presente;
+        resolve({ok: true, status: 204, corpo: null});
+      }
+      else if (url.includes('/api/opcoes')) {
+        resolve({ok: true, status: 200, corpo: {
+          tipos: ["Participação", "Palestrante", "Organizador"],
+          modelos: ["Modelo do evento", "Modelo do curso", "Modelo padrão"]
+        }});
+      }
+      else if (url.includes('/modelos/resolver')) {
+        resolve({ok: true, status: 200, corpo: {id: 1, nome: "Modelo do evento", texto: ""}});
+      }
+      else if (url.includes('/certificados') && method === 'POST') {
+         resolve({ok: true, status: 201, corpo: {
+            id: 1, tipo: reqBody.tipo, modelo: reqBody.modelo,
+            arquivo: "mock_certificado.pdf",
+            url: "javascript:alert('PDF gerado no sistema (Simulação)');"
+         }});
+      }
+      else if (url.includes('/crachas') && method === 'POST') {
+         // Cria o crachá na hora usando Canvas pra simular a imagem do Python
+         let canvas = document.createElement('canvas');
+         canvas.width = 600; canvas.height = 900;
+         let ctx = canvas.getContext('2d');
+         ctx.fillStyle = '#EF6C00'; ctx.fillRect(0,0,600,180);
+         ctx.fillStyle = '#ffffff'; ctx.fillRect(0,180,600,720);
+         ctx.fillStyle = '#000000'; ctx.font = 'bold 34px sans-serif'; ctx.textAlign = 'center';
+         ctx.fillText((reqBody.participante || '').toUpperCase(), 300, 350);
+         ctx.fillStyle = '#444444'; ctx.font = '28px sans-serif';
+         ctx.fillText(reqBody.evento || '', 300, 450);
+         
+         resolve({ok: true, status: 201, corpo: {
+            id: 1, arquivo: "cracha_gerado.png",
+            url: canvas.toDataURL('image/png')
+         }});
+      } else {
+         resolve({ok: false, status: 404, corpo: {erro: 'Rota não encontrada'}});
+      }
+    }, 150); // delayzinho falso
+  });
 }
+
 function limparCampo(el){ while (el.firstChild) el.removeChild(el.firstChild); }
+
 function mostrarArquivo(caixa, rotulo, arquivo, url, textoLink, comImagem){
   limparCampo(caixa); caixa.hidden = false;
   caixa.append(rotulo + ' ');
   const b = document.createElement('b'); b.textContent = arquivo; caixa.append(b, document.createElement('br'));
-  const a = document.createElement('a'); a.href = API + url; a.target = '_blank'; a.textContent = textoLink; caixa.append(a);
-  if (comImagem) { const img = document.createElement('img'); img.alt = 'Crachá gerado'; img.src = API + url; caixa.append(img); }
+  const a = document.createElement('a'); a.href = url; 
+  a.target = url.startsWith('javascript:') ? '_self' : '_blank'; 
+  a.textContent = textoLink; caixa.append(a);
+  if (comImagem) { const img = document.createElement('img'); img.alt = 'Crachá gerado'; img.src = url; caixa.append(img); }
 }
-document.querySelectorAll('[data-logo]').forEach(i => i.src = API + '/logo');
+
+// Logo provisória via Canvas, assim não precisa da imagem local do Python
+function desenharLogo(){
+  let canvas = document.createElement('canvas');
+  canvas.width = 240; canvas.height = 240;
+  let ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#EF6C00'; ctx.beginPath(); ctx.arc(120, 120, 110, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 16; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(70, 125); ctx.lineTo(105, 160); ctx.lineTo(170, 85); ctx.stroke();
+  return canvas.toDataURL('image/png');
+}
+const fakeLogo = desenharLogo();
+document.querySelectorAll('[data-logo]').forEach(i => i.src = fakeLogo);
 document.querySelectorAll('[data-voltar]').forEach(b => b.addEventListener('click', voltar));
 
-/* ============================ NAVEGAÇÃO ============================
-   Presença -> Certificado -> Crachá.  A rota fica no #hash (ex.: #/certificado?participante=Ana)
-   e cada tela é uma <section>. A tela de presença continua viva ao navegar (igual à pilha do Android). */
+/* ============================ NAVEGAÇÃO ============================ */
 function irPara(rota, dados){
   location.hash = '/' + rota + (dados ? '?' + new URLSearchParams(dados).toString() : '');
 }
@@ -221,7 +293,6 @@ const telaPresenca = (() => {
     });
   }
 
-  // GET /eventos/{id}/chamada
   async function carregar(){
     carregando(true);
     const r = await api(`/eventos/${idEvento}/chamada`).catch(() => ({ok: false}));
@@ -231,21 +302,19 @@ const telaPresenca = (() => {
     carregou = true; render(); resumo();
   }
 
-  // PUT /chamada/{id}/presenca  (um por participante alterado)
   async function salvar(){
     const alteradas = lista.filter(c => c.alterado);
     if (!alteradas.length) { toast('Nenhuma alteração pra salvar'); return; }
     carregando(true);
     let erros = 0;
     await Promise.all(alteradas.map(async c => {
-      const r = await api(`/chamada/${c.id}/presenca`, {method: 'PUT', headers: JSON_H, body: JSON.stringify({presente: c.presente})}).catch(() => ({ok: false}));
+      const r = await api(`/chamada/${c.id}/presenca`, {method: 'PUT', body: JSON.stringify({presente: c.presente})}).catch(() => ({ok: false}));
       if (r.ok) c.alterado = false; else erros++;
     }));
     carregando(false);
     toast(erros === 0 ? 'Presenças salvas!' : `${erros} falha(s) ao salvar. Toque em Salvar de novo.`);
   }
 
-  // regra de negócio: certificado só com presença validada (marcada E salva)
   function abrirCertificado(c){
     if (!c.presente) { toast('Certificado só pra quem tem presença validada'); return; }
     if (c.alterado)  { toast('Salve as presenças antes de emitir o certificado'); return; }
@@ -258,7 +327,7 @@ const telaPresenca = (() => {
       const novo = parseInt(params.get('evento_id') || '0', 10);
       if (novo) nomeEvento = params.get('evento') || nomeEvento;
       if (novo && novo !== idEvento) { idEvento = novo; carregou = false; }
-      if (!carregou) carregar();   // ao voltar das outras telas, mantém a lista como estava
+      if (!carregou) carregar();
     }
   };
 })();
@@ -277,18 +346,17 @@ const telaCertificado = (() => {
       if (!r.ok) { toast('Não consegui carregar os tipos e modelos'); return; }
       preencher($('spnTipo'), r.corpo.tipos); preencher($('spnModelo'), r.corpo.modelos); opcoesOk = true;
     }
-    if (idEvento) {   // modelo escolhido em cascata: evento -> curso -> padrão
+    if (idEvento) {
       const m = await api('/modelos/resolver/' + idEvento).catch(() => ({ok: false}));
       if (m.ok) $('spnModelo').value = m.corpo.nome;
     }
   }
 
-  // POST /certificados
   async function gerar(){
     const participante = $('cert-participante').value.trim(), evento = $('cert-evento').value.trim();
     if (!participante || !evento) { toast('Preencha o participante e o evento.'); return; }
     $('btnGerar').disabled = true;
-    const r = await api('/certificados', {method: 'POST', headers: JSON_H, body: JSON.stringify({
+    const r = await api('/certificados', {method: 'POST', body: JSON.stringify({
       participante, evento, tipo: $('spnTipo').value, modelo: $('spnModelo').value,
       participante_id: idParticipante || null, evento_id: idEvento || null})}).catch(() => ({ok: false}));
     $('btnGerar').disabled = false;
@@ -317,14 +385,13 @@ const telaCertificado = (() => {
 
 /* ============================ TELA 3: CRACHÁ ============================ */
 const telaCracha = (() => {
-  // POST /crachas
   async function gerar(){
     const participante = $('cr-participante').value.trim(), evento = $('cr-evento').value.trim();
     if (!participante || !evento) { toast('Preencha o evento e o participante!'); return; }
     $('txtParticipante').textContent = participante.toUpperCase();
     $('txtEvento').textContent = evento;
     $('botaoGerar').disabled = true;
-    const r = await api('/crachas', {method: 'POST', headers: JSON_H, body: JSON.stringify({participante, evento})}).catch(() => ({ok: false}));
+    const r = await api('/crachas', {method: 'POST', body: JSON.stringify({participante, evento})}).catch(() => ({ok: false}));
     $('botaoGerar').disabled = false;
     if (!r.ok) { toast((r.corpo && r.corpo.erro) || 'Erro ao salvar a imagem!'); return; }
     mostrarArquivo($('cr-resultado'), 'Imagem salva em:', r.corpo.arquivo, r.corpo.url, 'Abrir imagem', true);
